@@ -13,9 +13,9 @@ approved in any way by Riot Games, Inc. or any of its affiliates.
 """
 
 __author__ = 'Jennie Lees'
-__version__ = '1.4b'
+__version__ = '1.4'
 
-import urllib2
+import urllib.request, urllib.error, urllib.parse
 import json
 import unicodedata
 import re
@@ -35,8 +35,8 @@ class LeagueOfLegends:
     def __webrequest(self, url):
         # print 'Making request to: ' + url
         try:
-            opener = urllib2.build_opener(NotModifiedHandler())
-            req = urllib2.Request(url)
+            opener = urllib.request.build_opener(NotModifiedHandler())
+            req = urllib.request.Request(url)
 
             if url in self.__cache:
                 # Return summoner detail URLs from cache explicitly
@@ -45,38 +45,38 @@ class LeagueOfLegends:
                     return self.__cache[url]['response']
 
                 if 'etag' in self.__cache[url]:
-                    print 'Adding ETag to request header: '\
-                        + self.__cache[url]['etag']
+                    print('Adding ETag to request header: '\
+                        + self.__cache[url]['etag'])
                     req.add_header('If-None-Match',
                                    self.__cache[url]['etag'])
                 if 'last_modified' in self.__cache[url]:
-                    print 'Adding Last-Modified to request header: '\
-                        + self.__cache[url]['last_modified']
+                    print('Adding Last-Modified to request header: '\
+                        + self.__cache[url]['last_modified'])
                     req.add_header('If-Modified-Since',
                                    self.__cache[url]['last_modified'])
 
             url_handle = opener.open(req)
 
             if hasattr(url_handle, 'code') and url_handle.code == 304:
-                print 'Got 304 response, no body send'
+                print('Got 304 response, no body send')
                 return self.__cache[url]['response']
             else:
                 headers = url_handle.info()
                 response = url_handle.read()
-
+                
                 cache_data = {
                     'response': response,
                     'url': url.replace('?api_key=' + self.api_key, '')}
 
-                if headers.getheader('Last-Modified'):
-                    cache_data['last_modified'] = headers.getheader('Last-Modified')
+                if url_handle.getheader('Last-Modified'):
+                    cache_data['last_modified'] = url_handle.getheader('Last-Modified')
 
-                if headers.getheader('ETag'):
-                    cache_data['etag'] = headers.getheader('ETag').replace('"', '')
+                if url_handle.getheader('ETag'):
+                    cache_data['etag'] = url_handle.getheader('ETag').replace('"', '')
 
                 self.__cache[url] = cache_data
-                return response
-        except urllib2.HTTPError, e:
+                return response.decode("utf-8")
+        except urllib.error.HTTPError as e:
             # You should surround your code with try/catch that looks for a HTTPError
             # code 429 -- this is a rate limit error from Riot.
             # print 'HTTPError calling ' + url
@@ -168,7 +168,7 @@ class LeagueOfLegends:
         return response['games']
 
     # ====================================================================
-    # league-v2.5
+    # league-v2.4
     # https://developer.riotgames.com/api/methods#!/741
 
     # Get leagues mapped by summoner ID for a given list of summoner IDs.
@@ -441,47 +441,6 @@ class LeagueOfLegends:
         return response
 
     # ====================================================================
-    # match-v2.2
-    # https://developer.riotgames.com/api/methods#!/856
-
-    # Get match detail from match ID.
-    # https://developer.riotgames.com/api/methods#!/856/2992
-    def get_match(self, match_id, include_timeline=False):
-        if not match_id: return
-        self.set_api_version('2.2')
-        url = self.api_url + 'match/%s?api_key=%s' % (match_id, self.api_key)
-        if include_timeline:
-            url += '&includeTimeline=True'
-        response = json.loads(self.__webrequest(url))
-        return response
-
-
-    # ====================================================================
-    # matchhistory-v2.2
-    # https://developer.riotgames.com/api/methods#!/855
-
-    # Get match history from summoner ID.
-    # https://developer.riotgames.com/api/methods#!/855/2991
-    # Optional arguments:
-    #  championIds (comma-separated)
-    #  rankedQueues (comma-separated)
-    #  beginIndex
-    #  endIndex
-    def get_summoner_match_history(self, summoner_id=None, **kwargs):
-        if summoner_id is None:
-            if self.summoner_id is not None:
-                summoner_id = self.summoner_id
-            else:
-                return
-        self.set_api_version('2.2')
-        url = self.api_url + 'matchhistory/%s?api_key=%s' % (summoner_id, self.api_key)
-        if kwargs:
-            from urllib import urlencode
-            url += '&' + urlencode(kwargs)
-        response = json.loads(self.__webrequest(url))
-        return response
-
-    # ====================================================================
     # stats-v1.3
     # https://developer.riotgames.com/api/methods#!/622
 
@@ -587,7 +546,7 @@ class LeagueOfLegends:
         return response
 
     # ====================================================================
-    # team-v2.4
+    # team-v2.3
     # https://developer.riotgames.com/api/methods#!/743
 
     # Get teams mapped by summoner ID for a given list of summoner IDs.
@@ -690,7 +649,7 @@ class DataMismatchError(Exception):
     # Received data back for a different query than requested, e.g. summoner ID mismatch.
     pass
 
-class NotModifiedHandler(urllib2.BaseHandler):
+class NotModifiedHandler(urllib.request.BaseHandler):
 
     def http_error_304(self, req, fp, code, message, headers):
         addinfourl = urllib2.addinfourl(fp, headers, req.get_full_url())
